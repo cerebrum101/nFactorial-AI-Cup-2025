@@ -10,7 +10,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize Groq client for parameter extraction
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+def get_groq_client():
+    return Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+
 
 def extract_search_params_with_llm(conversation_text: str) -> SearchParams:
     """Use LLM to extract search parameters from conversation in any language"""
@@ -54,7 +58,7 @@ DO NOT set both min_price and max_price to the same value unless explicitly give
     try:
         print(f"DEBUG - LLM extraction input: '{conversation_text[:200]}...'")
         
-        completion = client.chat.completions.create(
+        completion = get_groq_client().chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": extraction_prompt}],
             temperature=0.1,  # Low temperature for consistent extraction
@@ -102,7 +106,8 @@ def extract_search_params_regex(conversation_text: str) -> SearchParams:
         'tokyo', 'new york', 'london', 'paris', 'berlin', 'madrid', 'rome',
         'moscow', 'beijing', 'seoul', 'bangkok', 'dubai', 'istanbul', 'kazakhstan',
         # Russian/Cyrillic names
-        'стамбул', 'москва', 'алматы', 'астана', 'нур-султан', 'токио', 'лондон', 'париж'
+        'стамбул', 'москва', 'алматы', 'астана', 'токио', 'лондон', 'париж',
+        
     ]
     
     # Mapping Russian city names to English for URL generation
@@ -111,7 +116,6 @@ def extract_search_params_regex(conversation_text: str) -> SearchParams:
         'москва': 'Moscow', 
         'алматы': 'Almaty',
         'астана': 'Astana',
-        'нур-султан': 'Nur-Sultan',
         'токио': 'Tokyo',
         'лондон': 'London',
         'париж': 'Paris'
