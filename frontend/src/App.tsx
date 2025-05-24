@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ChatContainer } from './components/ChatContainer';
 import { SearchResults } from './components/SearchResults';
 import { VoiceControls } from './components/VoiceControls';
@@ -55,7 +55,7 @@ const App: React.FC = () => {
           
           if (propertyIndex >= 0 && propertyIndex < searchResults.length) {
             console.log(`Voice command: selecting property ${propertyIndex + 1}`);
-            handlePropertySelect(searchResults[propertyIndex], propertyIndex);
+            handlePropertySelect(searchResults[propertyIndex]);
             return true; // Command handled
           }
         }

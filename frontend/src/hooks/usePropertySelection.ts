@@ -10,7 +10,7 @@ export const usePropertySelection = () => {
   const [showBookingOptions, setShowBookingOptions] = useState(false);
   const [bookingUrls, setBookingUrls] = useState<BookingUrls | null>(null);
 
-  const handlePropertySelect = async (property: SearchResult, index: number) => {
+  const handlePropertySelect = async (property: SearchResult) => {
     setSelectedProperty(property);
     
     const searchParams: SearchParams = {
