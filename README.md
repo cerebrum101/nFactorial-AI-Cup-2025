@@ -2,4 +2,4 @@
 
 ## Confind
 
-## yada yada description
+## AI Application that will allow you to find and book a place to stay in **one** click.
