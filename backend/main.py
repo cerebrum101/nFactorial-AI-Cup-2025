@@ -33,7 +33,8 @@ app.add_middleware(
 )
 
 # Initialize Groq client
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+def get_groq_client():
+    return Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 @app.get("/")
 async def root():
@@ -120,7 +121,7 @@ async def chat(chat_data: ChatMessage):
         messages.append({"role": "user", "content": chat_data.message})
         
         # Call Groq API
-        completion = client.chat.completions.create(
+        completion = get_groq_client().chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=messages,
             temperature=0.7,
