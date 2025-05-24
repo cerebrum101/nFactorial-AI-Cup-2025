@@ -27,8 +27,8 @@ COPY . .
 ENV CHROME_BIN=/usr/bin/google-chrome-stable
 ENV CHROME_PATH=/usr/bin/google-chrome-stable
 
-# Expose port
-EXPOSE 8000
+# Expose port (Render.com uses PORT env var or defaults to 10000)
+EXPOSE 10000
 
-# Start the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"] 
+# Start the application using PORT environment variable
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}"] 
