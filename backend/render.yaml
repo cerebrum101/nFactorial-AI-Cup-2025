@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: confind-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    branch: main
+    env:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PORT
+        value: 8000
+    buildCommand: ""
+    startCommand: "" 

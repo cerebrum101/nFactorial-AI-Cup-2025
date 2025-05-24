@@ -1,6 +1,7 @@
 import re
 import time
 import requests
+import os
 from bs4 import BeautifulSoup
 from typing import List, Dict
 from selenium import webdriver
@@ -12,28 +13,61 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 
-def scrape_airbnb_listings_selenium(search_url: str, max_listings: int = 3) -> List[Dict]:
-    """Scrape Airbnb search results using Selenium for JavaScript rendering"""
-    
-    # Setup Chrome options for headless browsing
+def get_chrome_options():
+    """Get Chrome options optimized for Docker/production environment"""
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run in background
+    
+    # Basic headless options
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-software-rasterizer")
+    chrome_options.add_argument("--disable-background-timer-throttling")
+    chrome_options.add_argument("--disable-backgrounding-occluded-windows")
+    chrome_options.add_argument("--disable-renderer-backgrounding")
+    chrome_options.add_argument("--disable-features=TranslateUI")
+    chrome_options.add_argument("--disable-ipc-flooding-protection")
     chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    
+    # Anti-detection
+    chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
+    
+    # Memory optimization
+    chrome_options.add_argument("--max_old_space_size=4096")
+    chrome_options.add_argument("--memory-pressure-off")
+    
+    # Use system Chrome if available (Docker environment)
+    chrome_binary = os.environ.get('CHROME_BIN') or os.environ.get('CHROME_PATH')
+    if chrome_binary and os.path.exists(chrome_binary):
+        chrome_options.binary_location = chrome_binary
+        print(f"DEBUG - Using system Chrome: {chrome_binary}")
+    
+    return chrome_options
+
+def scrape_airbnb_listings_selenium(search_url: str, max_listings: int = 3) -> List[Dict]:
+    """Scrape Airbnb search results using Selenium for JavaScript rendering"""
     
     driver = None
     try:
         print(f"DEBUG - Setting up Selenium driver...")
         
-        # Setup driver
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        # Get optimized Chrome options
+        chrome_options = get_chrome_options()
+        
+        # Setup driver with proper service
+        try:
+            # Try to use system ChromeDriver first (if available in Docker)
+            service = Service()
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        except Exception as e:
+            print(f"DEBUG - System ChromeDriver failed, using webdriver-manager: {e}")
+            # Fallback to webdriver-manager
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
         
         # Remove automation indicators
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
