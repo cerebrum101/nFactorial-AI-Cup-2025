@@ -102,7 +102,7 @@ def extract_search_params_regex(conversation_text: str) -> SearchParams:
     
     # First try to find known cities/locations directly (more reliable)
     known_locations = [
-        'almaty', 'astana', 'nur-sultan', 'shymkent', 'aktobe', 'taraz', 'pavlodar',
+        'almaty', 'astana', 'shymkent', 'aktobe', 'taraz', 'pavlodar',
         'tokyo', 'new york', 'london', 'paris', 'berlin', 'madrid', 'rome',
         'moscow', 'beijing', 'seoul', 'bangkok', 'dubai', 'istanbul', 'kazakhstan',
         # Russian/Cyrillic names
@@ -110,16 +110,7 @@ def extract_search_params_regex(conversation_text: str) -> SearchParams:
         
     ]
     
-    # Mapping Russian city names to English for URL generation
-    russian_to_english = {
-        'стамбул': 'Istanbul',
-        'москва': 'Moscow', 
-        'алматы': 'Almaty',
-        'астана': 'Astana',
-        'токио': 'Tokyo',
-        'лондон': 'London',
-        'париж': 'Paris'
-    }
+    
     
     # Check for known locations first (highest priority)
     for known in known_locations:
