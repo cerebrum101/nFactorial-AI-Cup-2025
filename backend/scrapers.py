@@ -12,6 +12,23 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
+import atexit
+
+# Global driver cache for reuse
+_driver_cache = None
+
+def cleanup_driver():
+    """Cleanup driver on exit"""
+    global _driver_cache
+    if _driver_cache:
+        try:
+            _driver_cache.quit()
+        except:
+            pass
+        _driver_cache = None
+
+# Register cleanup
+atexit.register(cleanup_driver)
 
 def get_chrome_options():
     """Get Chrome options optimized for Docker/production environment"""
@@ -28,17 +45,24 @@ def get_chrome_options():
     chrome_options.add_argument("--disable-renderer-backgrounding")
     chrome_options.add_argument("--disable-features=TranslateUI")
     chrome_options.add_argument("--disable-ipc-flooding-protection")
-    chrome_options.add_argument("--window-size=1920,1080")
+    
+    # PERFORMANCE OPTIMIZATIONS
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-plugins")
+    chrome_options.add_argument("--disable-images")  # Skip loading images
+    chrome_options.add_argument("--disable-javascript")  # Skip JS if possible
+    chrome_options.add_argument("--disable-css")  # Skip CSS
+    chrome_options.add_argument("--disable-web-security")
+    chrome_options.add_argument("--aggressive-cache-discard")
+    chrome_options.add_argument("--memory-pressure-off")
+    chrome_options.add_argument("--max-old-space-size=512")  # Reduce memory usage
+    chrome_options.add_argument("--window-size=1024,768")  # Smaller window
     
     # Anti-detection
     chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
-    
-    # Memory optimization
-    chrome_options.add_argument("--max_old_space_size=4096")
-    chrome_options.add_argument("--memory-pressure-off")
     
     # Use system Chrome if available (Docker environment)
     chrome_binary = os.environ.get('CHROME_BIN') or os.environ.get('CHROME_PATH')
@@ -51,33 +75,53 @@ def get_chrome_options():
 def scrape_airbnb_listings_selenium(search_url: str, max_listings: int = 3) -> List[Dict]:
     """Scrape Airbnb search results using Selenium for JavaScript rendering"""
     
-    driver = None
+    global _driver_cache
+    
     try:
-        print(f"DEBUG - Setting up Selenium driver...")
+        # Reuse existing driver if available
+        if _driver_cache:
+            try:
+                # Test if driver is still alive
+                _driver_cache.current_url
+                driver = _driver_cache
+                print("DEBUG - Reusing existing Chrome driver")
+            except:
+                # Driver is dead, create new one
+                _driver_cache = None
+                driver = None
+        else:
+            driver = None
         
-        # Get optimized Chrome options
-        chrome_options = get_chrome_options()
-        
-        # Setup driver with proper service
-        try:
-            # Try to use system ChromeDriver first (if available in Docker)
-            service = Service()
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-        except Exception as e:
-            print(f"DEBUG - System ChromeDriver failed, using webdriver-manager: {e}")
-            # Fallback to webdriver-manager
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        # Remove automation indicators
-        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        # Create new driver if needed
+        if not driver:
+            print(f"DEBUG - Setting up new Selenium driver...")
+            
+            # Get optimized Chrome options
+            chrome_options = get_chrome_options()
+            
+            # Setup driver with proper service
+            try:
+                # Try to use system ChromeDriver first (if available in Docker)
+                service = Service()
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+            except Exception as e:
+                print(f"DEBUG - System ChromeDriver failed, using webdriver-manager: {e}")
+                # Fallback to webdriver-manager
+                service = Service(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            # Remove automation indicators
+            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            
+            # Cache the driver for reuse
+            _driver_cache = driver
         
         print(f"DEBUG - Attempting to scrape with Selenium: {search_url}")
         driver.get(search_url)
         
         # Wait for page to load
         print("DEBUG - Waiting for page to load...")
-        time.sleep(3)
+        time.sleep(1)
         
         # Wait for listings to appear
         try:
@@ -424,10 +468,21 @@ def scrape_airbnb_listings_requests(search_url: str, max_listings: int = 3) -> L
         return []
 
 def scrape_airbnb_listings(search_url: str, max_listings: int = 3) -> List[Dict]:
-    """Main scraping function that tries Selenium first, then falls back to requests"""
+    """Main scraping function that tries requests first (faster), then falls back to Selenium"""
     print(f"DEBUG - Starting scraping process for: {search_url}")
     
-    # Try Selenium first (better for modern Airbnb)
+    # Try requests first (much faster - 1-2 seconds vs 5-10 seconds)
+    print("DEBUG - Trying fast requests method first...")
+    try:
+        results = scrape_airbnb_listings_requests(search_url, max_listings)
+        if results and len(results) > 0:
+            print("DEBUG - Requests scraping successful!")
+            return results
+    except Exception as e:
+        print(f"DEBUG - Requests failed: {e}")
+    
+    # Fallback to Selenium only if requests failed
+    print("DEBUG - Falling back to Selenium method...")
     try:
         results = scrape_airbnb_listings_selenium(search_url, max_listings)
         if results and any('selenium' in result.get('source', '') for result in results):
@@ -436,20 +491,14 @@ def scrape_airbnb_listings(search_url: str, max_listings: int = 3) -> List[Dict]
     except Exception as e:
         print(f"DEBUG - Selenium failed: {e}")
     
-    # Fallback to requests (original method)
-    print("DEBUG - Falling back to requests method...")
-    results = scrape_airbnb_listings_requests(search_url, max_listings)
-    
-    if not results:
-        # Final fallback - return redirect message
-        return [
-            {
-                'title': f'Properties available in {search_url.split("/s/")[1].split("/")[0] if "/s/" in search_url else "your location"}',
-                'price': 'Visit Airbnb for current pricing',
-                'rating': 'See actual reviews on site',
-                'link': search_url,
-                'source': 'airbnb_redirect'
-            }
-        ]
-    
-    return results 
+    # Final fallback - return redirect message
+    print("DEBUG - All scraping methods failed, returning redirect message")
+    return [
+        {
+            'title': f'Properties available in {search_url.split("/s/")[1].split("/")[0] if "/s/" in search_url else "your location"}',
+            'price': 'Visit Airbnb for current pricing',
+            'rating': 'See actual reviews on site',
+            'link': search_url,
+            'source': 'airbnb_redirect'
+        }
+    ] 
