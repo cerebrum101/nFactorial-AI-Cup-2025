@@ -21,7 +21,12 @@ app = FastAPI(title="Condfind Backend", description="AI Assistant for Airbnb Lis
 # Add CORS middleware to allow frontend requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Vite default ports
+    allow_origins=[
+        "http://localhost:5173", 
+        "http://localhost:3000",
+        "https://your-frontend-domain.vercel.app",  # Add your Vercel domain
+        "*"  # For development only
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

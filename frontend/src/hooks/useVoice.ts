@@ -51,6 +51,7 @@ export const useVoice = (options: UseVoiceOptions = {}) => {
   const recognitionRef = useRef<any>(null);
   const synthesisRef = useRef<SpeechSynthesis | null>(null);
   const isInitializedRef = useRef<boolean>(false);
+  const isListeningRef = useRef<boolean>(false);
 
   // Initialize speech synthesis immediately
   useEffect(() => {
@@ -75,6 +76,7 @@ export const useVoice = (options: UseVoiceOptions = {}) => {
 
       recognition.onstart = () => {
         console.log('Speech recognition started');
+        isListeningRef.current = true;
         setVoiceState(prev => ({ ...prev, isListening: true, isProcessing: false, error: null }));
       };
 
@@ -102,12 +104,14 @@ export const useVoice = (options: UseVoiceOptions = {}) => {
 
       recognition.onend = () => {
         console.log('Speech recognition ended');
+        isListeningRef.current = false;
         setVoiceState(prev => ({ ...prev, isListening: false, isProcessing: false }));
         if (onEnd) onEnd();
       };
 
       recognition.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error);
+        isListeningRef.current = false;
         const errorMessage = `Speech recognition error: ${event.error}`;
         setVoiceState(prev => ({ 
           ...prev, 
@@ -139,6 +143,12 @@ export const useVoice = (options: UseVoiceOptions = {}) => {
       return;
     }
 
+    // Check if already listening to prevent "already started" error
+    if (voiceState.isListening || isListeningRef.current) {
+      console.log('Speech recognition is already active, skipping start');
+      return;
+    }
+
     try {
       // Stop any ongoing speech
       if (synthesisRef.current) {
@@ -165,6 +175,12 @@ export const useVoice = (options: UseVoiceOptions = {}) => {
         return;
       }
 
+      // Double-check the recognition state before starting
+      if (voiceState.isListening || isListeningRef.current) {
+        console.log('Recognition became active during initialization, aborting start');
+        return;
+      }
+
       setVoiceState(prev => ({ 
         ...prev, 
         transcript: '', 
@@ -187,6 +203,7 @@ export const useVoice = (options: UseVoiceOptions = {}) => {
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
       console.log('Stopping speech recognition...');
+      isListeningRef.current = false;
       recognitionRef.current.stop();
     }
   }, []);

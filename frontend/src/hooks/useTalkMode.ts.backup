@@ -1,0 +1,86 @@
+import { useState } from 'react';
+import { useVoice } from './useVoice';
+
+interface UseTalkModeProps {
+  onVoiceInput: (transcript: string) => void;
+  onSpeakResponse: (text: string) => void;
+}
+
+export const useTalkMode = ({ onVoiceInput, onSpeakResponse }: UseTalkModeProps) => {
+  const [isTalkMode, setIsTalkMode] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState('en-US');
+
+  const {
+    isListening,
+    isProcessing,
+    isSpeaking,
+    transcript,
+    error: voiceError,
+    isSupported: voiceSupported,
+    startListening,
+    stopListening,
+    toggleListening,
+    speak,
+    stopSpeaking,
+    switchLanguage
+  } = useVoice({
+    language: currentLanguage,
+    continuous: isTalkMode,
+    interimResults: true,
+    onResult: (finalTranscript) => {
+      if (finalTranscript.trim() && isTalkMode) {
+        stopListening();
+        onVoiceInput(finalTranscript.trim());
+      }
+    },
+    onEnd: () => {
+      if (isTalkMode && !isSpeaking) {
+        setTimeout(() => {
+          if (isTalkMode && !isSpeaking) {
+            startListening();
+          }
+        }, 3000);
+      }
+    }
+  });
+
+  const toggleTalkMode = () => {
+    if (isTalkMode) {
+      setIsTalkMode(false);
+      stopListening();
+      stopSpeaking();
+    } else {
+      setIsTalkMode(true);
+      startListening();
+    }
+  };
+
+  const speakResponse = (text: string) => {
+    if (isTalkMode) {
+      speak(text);
+      onSpeakResponse(text);
+    }
+  };
+
+  const switchLanguageHandler = () => {
+    const newLanguage = currentLanguage === 'en-US' ? 'ru-RU' : 'en-US';
+    setCurrentLanguage(newLanguage);
+    switchLanguage(newLanguage);
+  };
+
+  return {
+    isTalkMode,
+    currentLanguage,
+    isListening,
+    isProcessing,
+    isSpeaking,
+    transcript,
+    voiceError,
+    voiceSupported,
+    toggleTalkMode,
+    speakResponse,
+    switchLanguageHandler,
+    toggleListening,
+    stopSpeaking
+  };
+};
