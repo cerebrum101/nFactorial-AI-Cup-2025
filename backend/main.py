@@ -16,7 +16,7 @@ from utils import build_airbnb_url, get_persona_prompt, format_search_confirmati
 # Load environment variables
 load_dotenv()
 
-app = FastAPI(title="Condfind Backend", description="AI Assistant for Airbnb Listings")
+app = FastAPI(title="Confind Backend", description="AI Assistant for Airbnb Listings")
 
 # Add CORS middleware to allow frontend requests
 app.add_middleware(
@@ -38,7 +38,7 @@ def get_groq_client():
 
 @app.get("/")
 async def root():
-    return {"message": "Condfind Backend is running!"}
+    return {"message": "Confind Backend is running!"}
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(chat_data: ChatMessage):
@@ -291,7 +291,7 @@ def generate_booking_url(room_id, search_params):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "condfind-backend"}
+    return {"status": "healthy", "service": "confind-backend"}
 
 if __name__ == "__main__":
     import uvicorn

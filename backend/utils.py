@@ -97,7 +97,7 @@ def format_search_confirmation(params: SearchParams) -> str:
 
 def get_persona_prompt(search_context: str = "") -> str:
     """Get the concise persona prompt with optional search context"""
-    base_prompt = """You are Alex, a helpful AI travel assistant for Condfind. Be friendly but CONCISE and DIRECT.
+    base_prompt = """You are Alex, a helpful AI travel assistant for Confind. Be friendly but CONCISE and DIRECT.
 
 Your job:
 1. Help find Airbnb properties  

@@ -6,7 +6,7 @@ export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: "Hi! I'm Alex, your AI travel assistant from Condfind. I'm here to help you find the perfect Airbnb for your next trip! Where are you planning to stay?",
+      text: "Hi! I'm Alex, your AI travel assistant from Confind. I'm here to help you find the perfect Airbnb for your next trip! Where are you planning to stay?",
       sender: 'ai',
       timestamp: new Date()
     }

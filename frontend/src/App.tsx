@@ -180,7 +180,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center w-full">
       <div className="w-full max-w-7xl h-[800px] bg-white shadow-xl rounded-lg flex flex-col">
         <header className="bg-blue-600 text-white p-8 rounded-t-lg flex-shrink-0">
-          <h1 className="text-5xl font-bold text-center">Condfind</h1>
+          <h1 className="text-5xl font-bold text-center">Confind</h1>
           <p className="text-center">Your AI Assistant for Finding the Perfect Stay</p>
         </header>
 
