@@ -104,14 +104,17 @@ async def chat(chat_data: ChatMessage):
                 print(f"DEBUG - Generated URL: {search_url}")
                 search_results = scrape_airbnb_listings(search_url)
                 
-                # Create enhanced prompt with search context
-                search_context = f"\n\nSEARCH RESULTS CONTEXT: You just performed a search for {search_params.location}"
-                if search_params.guests:
-                    search_context += f" for {search_params.guests} guests"
-                if search_params.min_price or search_params.max_price:
-                    search_context += f" with budget ${search_params.min_price or 0}-${search_params.max_price or '∞'}"
-                
-                search_context += f"\n\nFound {len(search_results)} listings. Present them professionally and ask if they'd like more details about any specific property or want to refine the search."
+                # Create enhanced prompt with actual search results
+                if search_results and len(search_results) > 0:
+                    search_context = f"\n\nSEARCH COMPLETED: I found {len(search_results)} properties for {search_params.location}"
+                    if search_params.guests:
+                        search_context += f" for {search_params.guests} guests"
+                    if search_params.min_price or search_params.max_price:
+                        search_context += f" with budget ${search_params.min_price or 0}-${search_params.max_price or '∞'}"
+                    
+                    search_context += f". The frontend will display the actual search results automatically. JUST SAY something like 'I found {len(search_results)} great options for you!' - DO NOT list fake properties or make up details. The real properties will be shown by the system."
+                else:
+                    search_context = f"\n\nSEARCH COMPLETED: No properties found for {search_params.location} with the specified criteria. Suggest adjusting the search parameters or trying a different location."
                 
                 persona_prompt = get_persona_prompt(search_context)
             except Exception as e:
