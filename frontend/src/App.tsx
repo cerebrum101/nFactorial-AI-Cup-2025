@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-import { SearchResults } from './components/SearchResults';
+// import { SearchResults } from './components/SearchResults';
 import { VoiceControls } from './components/VoiceControls';
 import { useChat } from './hooks/useChat';
 import { useTalkMode } from './hooks/useTalkMode';
@@ -21,7 +21,7 @@ const App: React.FC = () => {
     selectedProperty, 
     showPropertySelection, 
     showBookingOptions, 
-    bookingUrls,
+    // bookingUrls,
     handlePropertySelect,
     handleMessageHost,
     handleBookNow,
