@@ -208,51 +208,88 @@ export const useVoice = (options: UseVoiceOptions = {}) => {
     }
   }, []);
 
-  // Text-to-speech function
+  // Text-to-speech function with robust error handling
   const speak = useCallback((text: string) => {
     if (!synthesisRef.current) return;
 
-    // Cancel any ongoing speech
+    // Cancel any ongoing speech first
     synthesisRef.current.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
     
-    // Set language based on current language
-    utterance.lang = language;
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    utterance.volume = 1;
+    // Small delay to ensure cancellation is processed
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Set language and speech parameters
+      utterance.lang = language;
+      utterance.rate = 0.9; // Slightly slower for better clarity
+      utterance.pitch = 1;
+      utterance.volume = 1;
 
-    utterance.onstart = () => {
-      console.log('Speech synthesis started');
-      setVoiceState(prev => ({ ...prev, isSpeaking: true }));
-    };
+      // Enhanced event handlers with better error recovery
+      utterance.onstart = () => {
+        console.log('Speech synthesis started:', text.substring(0, 50) + '...');
+        setVoiceState(prev => ({ ...prev, isSpeaking: true, error: null }));
+      };
 
-    utterance.onend = () => {
-      console.log('Speech synthesis ended');
-      setVoiceState(prev => ({ ...prev, isSpeaking: false }));
-    };
+      utterance.onend = () => {
+        console.log('Speech synthesis completed normally');
+        setVoiceState(prev => ({ ...prev, isSpeaking: false }));
+      };
 
-    utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event);
-      setVoiceState(prev => ({ 
-        ...prev, 
-        isSpeaking: false, 
-        error: `Speech synthesis error: ${event.error}` 
-      }));
-    };
+      utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event.error, 'for text:', text.substring(0, 50));
+        
+        // Handle different error types
+        if (event.error === 'interrupted' || event.error === 'canceled') {
+          // User interrupted or browser cancelled - this is normal, don't show error
+          console.log('Speech was interrupted (normal behavior)');
+          setVoiceState(prev => ({ ...prev, isSpeaking: false, error: null }));
+        } else if (event.error === 'network') {
+          // Network issue - could retry
+          setVoiceState(prev => ({ 
+            ...prev, 
+            isSpeaking: false, 
+            error: 'Network error during speech synthesis' 
+          }));
+        } else {
+          // Other errors - show but don't break the experience
+          setVoiceState(prev => ({ 
+            ...prev, 
+            isSpeaking: false, 
+            error: `Speech error: ${event.error}` 
+          }));
+        }
+      };
 
-    setVoiceState(prev => ({ ...prev, error: null }));
-    console.log('Starting speech synthesis...');
-    synthesisRef.current.speak(utterance);
+      // Clear any previous errors before speaking
+      setVoiceState(prev => ({ ...prev, error: null }));
+      
+      try {
+        console.log('Starting speech synthesis for:', text.substring(0, 50) + '...');
+        synthesisRef.current!.speak(utterance);
+      } catch (error) {
+        console.error('Error calling speak():', error);
+        setVoiceState(prev => ({ 
+          ...prev, 
+          isSpeaking: false, 
+          error: 'Failed to start speech synthesis' 
+        }));
+      }
+    }, 100); // Small delay to ensure clean state
   }, [language]);
 
-  // Stop speaking
+  // Enhanced stop speaking with better cleanup
   const stopSpeaking = useCallback(() => {
     if (synthesisRef.current) {
       console.log('Stopping speech synthesis...');
-      synthesisRef.current.cancel();
-      setVoiceState(prev => ({ ...prev, isSpeaking: false }));
+      try {
+        synthesisRef.current.cancel();
+        setVoiceState(prev => ({ ...prev, isSpeaking: false, error: null }));
+      } catch (error) {
+        console.error('Error stopping speech:', error);
+        // Still update state even if cancel failed
+        setVoiceState(prev => ({ ...prev, isSpeaking: false }));
+      }
     }
   }, []);
 

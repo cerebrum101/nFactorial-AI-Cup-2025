@@ -93,18 +93,16 @@ const App: React.FC = () => {
     currentLanguage,
     isListening,
     isSpeaking,
-    // transcript,
+    autoProcessedTranscript,
     voiceError,
     voiceSupported,
     isWaitingForResponse,
     toggleTalkMode,
     speakResponse,
-    switchLanguageHandler,
-    toggleListening,
-    stopSpeaking
+    switchLanguageHandler
   } = useTalkMode({
     onVoiceInput: handleVoiceInput,
-    onSpeakResponse: (text) => console.log('AI spoke:', text),
+    onSpeakResponse: (text) => console.log('📢 AI spoke:', text),
     onVoiceCommand: handleVoiceCommand
   });
 
@@ -141,15 +139,69 @@ const App: React.FC = () => {
     }
   };
 
-  function handleVoiceInput(transcript: string) {
-    setInputValue(transcript);
-    // Auto-send after 2 seconds for better UX
-    setTimeout(() => {
-      if (inputValue.trim() || transcript.trim()) {
-        handleSendMessage();
-      }
-    }, 2000);
+  function handleVoiceInput(transcript: string, confidence?: number) {
+    console.log('📢 Voice input received:', transcript, 'confidence:', confidence);
+    
+    // In talk mode, auto-send processed transcript without manual intervention
+    if (isTalkMode) {
+      setInputValue(transcript);
+      // Immediate send with short delay for UI feedback
+      setTimeout(() => {
+        if (transcript.trim()) {
+          sendVoiceMessage(transcript);
+        }
+      }, 500); // Brief delay to show the processed text
+    } else {
+      // In manual mode, just populate the input field
+      setInputValue(transcript);
+    }
   }
+
+  // Separate function for voice-triggered messages
+  const sendVoiceMessage = async (messageText: string) => {
+    if (!messageText.trim() || isLoading) return;
+
+    // Don't clear input immediately in talk mode - let user see what was processed
+    if (!isTalkMode) {
+      setInputValue('');
+    }
+    
+    try {
+      const data = await sendMessage(messageText);
+      
+      // Clear input after successful send in talk mode
+      if (isTalkMode) {
+        setTimeout(() => setInputValue(''), 1000);
+      }
+      
+      // ALWAYS speak AI responses in talk mode
+      if (isTalkMode && data.response) {
+        // Small delay to ensure message is added to chat before speaking
+        setTimeout(() => {
+          speakResponse(data.response);
+        }, 300);
+      }
+
+      if (data.search_results) {
+        updateSearchResults(data.search_results);
+        
+        // Announce search results in talk mode with better phrasing
+        if (isTalkMode && data.search_results.length > 0) {
+          const announcement = `Great! I found ${data.search_results.length} properties for you. You can say "select property 1" or "choose the first one" to pick one.`;
+          setTimeout(() => {
+            speakResponse(announcement);
+          }, 2000); // Longer delay to let the main response finish
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send voice message:', error);
+      if (isTalkMode) {
+        setTimeout(() => {
+          speakResponse("Sorry, I encountered an error. Please try again.");
+        }, 100);
+      }
+    }
+  };
 
   const handleMessageHostWithFeedback = () => {
     handleMessageHost();
@@ -330,14 +382,12 @@ const App: React.FC = () => {
           currentLanguage={currentLanguage}
           isListening={isListening}
           isSpeaking={isSpeaking}
-          transcript=""
+          autoProcessedTranscript={autoProcessedTranscript}
           voiceError={voiceError}
           voiceSupported={voiceSupported}
           isWaitingForResponse={isWaitingForResponse}
           onToggleTalkMode={toggleTalkMode}
           onLanguageSwitch={switchLanguageHandler}
-          onToggleListening={toggleListening}
-          onStopSpeaking={stopSpeaking}
         />
       </div>
     </div>
