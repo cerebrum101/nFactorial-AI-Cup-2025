@@ -136,6 +136,12 @@ const App: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to send message:', error);
+      // Clear waiting state on error in talk mode
+      if (isTalkMode) {
+        setTimeout(() => {
+          speakResponse("Sorry, I encountered an error. Please try again.");
+        }, 100);
+      }
     }
   };
 

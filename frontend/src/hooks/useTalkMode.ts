@@ -119,6 +119,7 @@ export const useTalkMode = ({ onVoiceInput, onSpeakResponse, onVoiceCommand }: U
     // Check for voice commands first
     if (onVoiceCommand && onVoiceCommand(processedTranscript)) {
       console.log('📢 Voice command handled, restarting listening');
+      setIsWaitingForResponse(false); // Clear waiting state
       scheduleRestart();
       return;
     }
@@ -127,8 +128,24 @@ export const useTalkMode = ({ onVoiceInput, onSpeakResponse, onVoiceCommand }: U
     setIsWaitingForResponse(true);
     stopListening();
     
-    // Send the processed transcript directly
-    onVoiceInput(processedTranscript, 0.95); // High confidence since we processed it
+    // Send the processed transcript directly with timeout fallback
+    try {
+      onVoiceInput(processedTranscript, 0.95); // High confidence since we processed it
+      
+      // Fallback timeout to clear waiting state if no response comes
+      setTimeout(() => {
+        if (isWaitingForResponseRef.current) {
+          console.log('📢 Timeout: Clearing waiting state after no response');
+          setIsWaitingForResponse(false);
+          scheduleRestart();
+        }
+      }, 10000); // 10 second timeout
+      
+    } catch (error) {
+      console.error('📢 Error sending voice input:', error);
+      setIsWaitingForResponse(false);
+      scheduleRestart();
+    }
   }, [onVoiceInput, onVoiceCommand, scheduleRestart, processTranscript]);
 
   const handleVoiceEnd = useCallback(() => {

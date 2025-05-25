@@ -134,8 +134,7 @@ def should_trigger_search(message: str, params: SearchParams, conversation_histo
         print(f"DEBUG - IMMEDIATE SEARCH: Message ends with search trigger '{last_word}'")
         return True
     
-    # 4. If this is a follow-up message after we already have good info - don't auto-search
-    # This prevents the comprehensive details issue
+    # 4. If this is a follow-up message after we already have good info - auto-search more often
     has_comprehensive_info = (
         params.location and
         params.guests and
@@ -143,19 +142,34 @@ def should_trigger_search(message: str, params: SearchParams, conversation_histo
         (params.checkin or params.checkout)
     )
     
-    if has_comprehensive_info and len(message.split()) > 5:  # Long message with lots of details
-        print(f"DEBUG - COMPREHENSIVE INFO: Need confirmation for detailed request")
-        return False  # Require confirmation for comprehensive requests
+    # REDUCED the strictness - only require confirmation for VERY complex messages
+    if has_comprehensive_info and len(message.split()) > 10:  # Changed from 5 to 10 words
+        print(f"DEBUG - COMPREHENSIVE INFO: Need confirmation for very detailed request")
+        return False  # Require confirmation for very comprehensive requests
     
-    # 5. Auto-search for simple additions to existing info
-    if params.location and not has_comprehensive_info:
-        # Only auto-search if this is a simple addition, not comprehensive details
+    # 5. Auto-search for most cases when we have location + any detail
+    if params.location:
+        has_any_detail = (
+            params.guests or 
+            params.max_price or 
+            params.min_price or
+            params.checkin or
+            params.checkout or
+            params.property_type
+        )
+        
+        if has_any_detail:
+            print(f"DEBUG - AUTO SEARCH: Have location + details")
+            return True
+    
+    # 6. Auto-search for simple additions to existing info
+    if params.location:
         simple_additions = [
             "center", "downtown", "cheap", "expensive", "budget", "close",
             "near", "apartment", "house", "studio"
         ]
         
-        if any(addition in message_lower for addition in simple_additions) and len(message.split()) <= 3:
+        if any(addition in message_lower for addition in simple_additions):
             print(f"DEBUG - AUTO SEARCH: Simple addition to existing info")
             return True
     
@@ -164,7 +178,7 @@ def should_trigger_search(message: str, params: SearchParams, conversation_histo
 
 def should_show_confirmation(params: SearchParams, conversation_history: list) -> bool:
     """
-    Show confirmation for comprehensive requests to ensure accuracy.
+    Show confirmation only for very limited cases - mostly auto-search now.
     """
     
     # Must have location as minimum
@@ -174,7 +188,7 @@ def should_show_confirmation(params: SearchParams, conversation_history: list) -
     # Check if we recently showed a confirmation - don't repeat
     recent_conversation = ""
     if conversation_history:
-        for msg in conversation_history[-5:]:  # Check last 5 messages
+        for msg in conversation_history[-3:]:  # Check last 3 messages only
             if msg.get("sender") == "assistant":
                 recent_conversation += msg.get("text", "").lower()
     
@@ -187,28 +201,22 @@ def should_show_confirmation(params: SearchParams, conversation_history: list) -
         print("DEBUG - No confirmation: Already asked recently")
         return False
     
-    # Show confirmation when we have good info that should be verified
-    has_searchable_info = (
-        params.location and (
-            params.guests or 
-            params.max_price or 
-            params.min_price or
-            params.checkin or
-            params.checkout or
-            params.property_type
-        )
+    # Only show confirmation in very rare cases - when user provided ONLY location
+    only_has_location = (
+        params.location and
+        not params.guests and
+        not params.max_price and
+        not params.min_price and
+        not params.checkin and
+        not params.checkout and
+        not params.property_type
     )
     
-    if has_searchable_info:
-        print("DEBUG - Show confirmation: Have searchable information to verify")
+    if only_has_location:
+        print("DEBUG - Show confirmation: Only location provided, need more details")
         return True
     
-    # Show confirmation if user just provided location only
-    if params.location and not has_searchable_info:
-        print("DEBUG - Show confirmation: Location only, need more details")
-        return True
-    
-    print("DEBUG - No confirmation needed")
+    print("DEBUG - No confirmation needed - auto-search")
     return False
 
 def get_missing_params_message(params: SearchParams) -> str:
