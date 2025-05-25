@@ -30,7 +30,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
   currentLanguage,
   isListening,
   isSpeaking,
-  transcript,
+//   transcript,
   voiceError,
   voiceSupported,
   isWaitingForResponse,

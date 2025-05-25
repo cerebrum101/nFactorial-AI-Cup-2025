@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChatContainer } from './components/ChatContainer';
+
 import { SearchResults } from './components/SearchResults';
 import { VoiceControls } from './components/VoiceControls';
 import { useChat } from './hooks/useChat';
@@ -93,7 +93,7 @@ const App: React.FC = () => {
     currentLanguage,
     isListening,
     isSpeaking,
-    transcript,
+    // transcript,
     voiceError,
     voiceSupported,
     isWaitingForResponse,
