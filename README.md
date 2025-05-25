@@ -2,7 +2,7 @@
 
 # Confind
 
-# https://confind.vercel.app/[https://confind.vercel.app/]
+# https://confind.vercel.app
 
 *Your AI Assistant for Finding a place to stay*
 
