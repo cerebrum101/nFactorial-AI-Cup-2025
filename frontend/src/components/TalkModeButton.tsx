@@ -21,7 +21,7 @@ const TalkModeButton: React.FC<TalkModeButtonProps> = ({
 }) => {
 
   const getButtonStyles = () => {
-    const baseStyles = "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-300 flex items-center space-x-2 relative";
+    const baseStyles = "px-3 py-2 rounded-full font-medium text-xs transition-all duration-300 flex items-center space-x-1 relative flex-shrink-0";
     
     if (!isSupported) {
       return `${baseStyles} bg-gray-300 text-gray-500 cursor-not-allowed`;
@@ -39,7 +39,7 @@ const TalkModeButton: React.FC<TalkModeButtonProps> = ({
       }
     }
     
-    return `${baseStyles} bg-gray-200 text-gray-700 hover:bg-gray-300 hover:shadow-md`;
+    return `${baseStyles} bg-gray-200 text-white hover:bg-gray-300 hover:shadow-md`;
   };
 
   const getButtonIcon = () => {
@@ -49,23 +49,23 @@ const TalkModeButton: React.FC<TalkModeButtonProps> = ({
       if (isListening) return '🎤';
       if (isSpeaking) return '🔊';
       if (isWaitingForResponse) return '⏳';
-      return '💬';
+      return '🎧';
     }
     
-    return '💬';
+    return '🎧';
   };
 
   const getButtonText = () => {
-    if (!isSupported) return 'Voice Not Supported';
+    if (!isSupported) return 'No Voice';
     
     if (isTalkMode) {
-      if (isListening) return 'Listening...';
-      if (isSpeaking) return 'AI Speaking...';
-      if (isWaitingForResponse) return 'Processing...';
-      return 'Talk Mode ON';
+      if (isListening) return 'Listening';
+      if (isSpeaking) return 'Speaking';
+      if (isWaitingForResponse) return 'Processing';
+      return 'ON';
     }
     
-    return 'Start Talk Mode';
+    return 'Talk';
   };
 
   const getTooltipText = () => {

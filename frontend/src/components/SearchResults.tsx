@@ -23,7 +23,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   onBookNow
 }) => {
   return (
-    <div className="w-full p-6">
+    <div className="w-full p-6 overflow-y-auto flex-shrink-0 max-h-96">
       {results.length > 0 && (
         <>
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-4">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChatContainer } from './components/ChatContainer';
 import { SearchResults } from './components/SearchResults';
 import { VoiceControls } from './components/VoiceControls';
@@ -9,6 +9,13 @@ import { usePropertySelection } from './hooks/usePropertySelection';
 const App: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const { messages, isLoading, sendMessage, addMessage } = useChat();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+  
   const { 
     searchResults, 
     selectedProperty, 
@@ -136,10 +143,12 @@ const App: React.FC = () => {
 
   function handleVoiceInput(transcript: string) {
     setInputValue(transcript);
-    // Shorter delay for better responsiveness
+    // Auto-send after 2 seconds for better UX
     setTimeout(() => {
-      handleSendMessage();
-    }, 200);
+      if (inputValue.trim() || transcript.trim()) {
+        handleSendMessage();
+      }
+    }, 2000);
   }
 
   const handleMessageHostWithFeedback = () => {
@@ -177,26 +186,60 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center w-full">
-      <div className="w-full max-w-7xl h-[800px] bg-white shadow-xl rounded-lg flex flex-col">
-        <header className="bg-blue-600 text-white p-8 rounded-t-lg flex-shrink-0">
-          <h1 className="text-5xl font-bold text-center">Confind</h1>
-          <p className="text-center">Your AI Assistant for Finding the Perfect Stay</p>
-        </header>
+    <div className="h-screen bg-gray-100 p-4 flex items-center justify-center w-full overflow-hidden">
+      <div className="w-full h-[95%] max-w-7xl bg-white shadow-xl rounded-lg flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="overflow-y-auto flex-1">
+            <header className="bg-blue-600 text-white p-4 rounded-t-lg">
+              <h1 className="text-2xl font-bold text-center">Confind</h1>
+              <p className="text-center text-sm">Your AI Assistant for Finding the Perfect Stay</p>
+            </header>
+            
+            <main className="p-6 lg:p-8 space-y-4">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-2xl px-4 py-2 rounded-2xl text-sm md:text-base ${
+                      msg.sender === 'user' 
+                        ? 'bg-blue-500 text-white rounded-br-md' 
+                        : 'bg-gray-200 text-gray-800 rounded-bl-md'
+                    }`}
+                  >
+                    <div className="whitespace-pre-line">{msg.text}</div>
+                    <div className="text-xs opacity-75 mt-1">
+                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              ))}
 
-        <ChatContainer messages={messages} isLoading={isLoading} />
-        
-        {showPropertySelection && (
-          <SearchResults
-            results={searchResults}
-            selectedProperty={selectedProperty}
-            showBookingOptions={showBookingOptions}
-            bookingUrls={bookingUrls}
-            onSelect={handlePropertySelect}
-            onMessageHost={handleMessageHostWithFeedback}
-            onBookNow={handleBookNowWithFeedback}
-          />
-        )}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-200 text-gray-800 rounded-bl-md px-4 py-2 rounded-2xl">
+                    <div className="text-sm animate-pulse">Alex is typing...</div>
+                  </div>
+                </div>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </main>
+          </div>
+          
+          {showPropertySelection && (
+            <SearchResults
+              results={searchResults}
+              selectedProperty={selectedProperty}
+              showBookingOptions={showBookingOptions}
+              bookingUrls={bookingUrls}
+              onSelect={handlePropertySelect}
+              onMessageHost={handleMessageHostWithFeedback}
+              onBookNow={handleBookNowWithFeedback}
+            />
+          )}
+        </div>
         
         <VoiceControls
           inputValue={inputValue}
@@ -207,7 +250,7 @@ const App: React.FC = () => {
           currentLanguage={currentLanguage}
           isListening={isListening}
           isSpeaking={isSpeaking}
-          transcript={transcript}
+          transcript=""
           voiceError={voiceError}
           voiceSupported={voiceSupported}
           isWaitingForResponse={isWaitingForResponse}
