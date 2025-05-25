@@ -1,39 +1,36 @@
-# Confind
-**By Atay Kim**
+# Atay Kim
 
-*Your AI Assistant for Finding the Perfect Stay*
+# Confind
+
+# https://confind.vercel.app/[https://confind.vercel.app/]
+
+*Your AI Assistant for Finding a place to stay*
 
 ---
-
-## What is Confind?
-
-Confind is an intelligent travel assistant that revolutionizes how you search for accommodations. Instead of manually filtering through hundreds of Airbnb listings, you simply tell Confind what you're looking for in natural language—whether typed or spoken—and it finds, scrapes, and presents real properties with direct booking capabilities.
-
-Think of it as having a personal travel agent who understands exactly what you want, speaks your language (literally—supports English and Russian), and can instantly pull up actual Airbnb listings with real prices, ratings, and availability.
 
 ## 🏗️ Tech Stack
 
 **Frontend:**
-- **React 18** with TypeScript for type safety
-- **Vite** for lightning-fast development and builds
-- **Tailwind CSS** for responsive, modern UI
-- **Web Speech API** for voice recognition and synthesis
-- **Vercel** for seamless frontend deployment
+- **React 18** with TypeScript 
+- **Vite** 
+- **Tailwind CSS** 
+- **Web Speech API** 
+- **Vercel** 
 
 **Backend:**
-- **FastAPI** (Python) for high-performance async API
+- **FastAPI** (Python) 
 - **Groq LLaMA 3.1** for intelligent natural language processing
-- **BeautifulSoup + Selenium** for robust web scraping
+- **BeautifulSoup + Selenium** for web scraping
 - **Pydantic** for data validation and serialization
-- **Render.com** for reliable backend hosting
+- **Render.com** for backend hosting
 
 **Key Libraries:**
-- `speech-recognition` and `speechSynthesis` APIs for talk mode
-- `requests` and `selenium` for dual-strategy web scraping
-- `groq-python` for AI-powered parameter extraction
-- `python-dotenv` for secure environment management
+- `speech-recognition` and `speechSynthesis` 
+- `requests` and `selenium` 
+- `groq-python` 
+- `python-dotenv` 
 
-## 🔄 Workflow & How It Actually Works
+##  Workflow
 
 ### 1. **Smart Query Processing**
 When you say something like *"Find me apartments in Istanbul for 3 people under $80 for June 15-20"*, here's what happens behind the scenes:
@@ -76,7 +73,7 @@ When you select a property, we generate authentic Airbnb URLs:
 - **Book Now:** Takes you straight to Airbnb's booking page with your dates pre-filled
 - **Secure:** All transactions happen on Airbnb.com for safety
 
-## 🚀 Technical Considerations
+## Technical Considerations
 
 ### Performance Optimizations
 - **Smart Caching:** Recent searches cached to avoid re-scraping
@@ -112,7 +109,7 @@ When you select a property, we generate authentic Airbnb URLs:
 - **🔗 Direct Booking:** One-click access to actual Airbnb pages
 - **⏱️ Fast Response:** Optimized for speed with <3 second typical response times
 
-## 🛠️ Setup & Installation
+## 🛠️ Local Setup & Installation
 
 ### Backend Setup
 ```bash
