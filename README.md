@@ -136,12 +136,6 @@ PORT=10000
 VITE_API_URL=https://your-backend.render.com
 ```
 
-## 🌟 Why Confind?
-
-Traditional booking sites make you click through endless filters and pages. Confind understands that in 2024, you should be able to just *say* what you want and get real results immediately.
-
-Whether you're planning a weekend getaway or a month-long adventure, Confind makes finding the perfect place as easy as having a conversation.
-
 ---
 
 *Built with ❤️ for the nFactorial AI Cup 2025*
