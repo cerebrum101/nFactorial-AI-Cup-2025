@@ -101,7 +101,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({
             isWaitingForResponse ? "Processing your request..." :
             isLoading ? "Alex is thinking..." :
             isTalkMode ? "Talk mode active - speak your request..." :
-            "Tell me what you're looking for..."
+            "Tell Alex your destination, dates, number of people, and budget..."
           }
           disabled={isLoading}
           className="flex-1 p-3 text-black text-sm md:text-base border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50 disabled:cursor-not-allowed"

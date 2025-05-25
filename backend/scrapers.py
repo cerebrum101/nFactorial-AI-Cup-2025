@@ -57,6 +57,13 @@ def get_chrome_options():
     chrome_options.add_argument("--memory-pressure-off")
     chrome_options.add_argument("--max-old-space-size=512")  # Reduce memory usage
     chrome_options.add_argument("--window-size=1024,768")  # Smaller window
+    chrome_options.add_argument("--disable-logging")
+    chrome_options.add_argument("--disable-dev-tools")
+    chrome_options.add_argument("--disable-default-apps")
+    chrome_options.add_argument("--disable-sync")
+    chrome_options.add_argument("--no-first-run")
+    chrome_options.add_argument("--fast-start")
+    chrome_options.add_argument("--disable-background-networking")
     
     # Anti-detection
     chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -125,7 +132,7 @@ def scrape_airbnb_listings_selenium(search_url: str, max_listings: int = 3) -> L
         
         # Wait for listings to appear
         try:
-            WebDriverWait(driver, 10).until(
+            WebDriverWait(driver, 5).until(  # Reduced from 10 to 5 seconds
                 EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='card-container'], [aria-label*='listing'], .atm_9s_1txwivl"))
             )
             print("DEBUG - Listings found, proceeding to scrape...")
@@ -399,7 +406,7 @@ def scrape_airbnb_listings_requests(search_url: str, max_listings: int = 3) -> L
     
     try:
         print(f"DEBUG - Attempting to scrape: {search_url}")
-        response = requests.get(search_url, headers=headers, timeout=10)
+        response = requests.get(search_url, headers=headers, timeout=5)  # Reduced from 10 to 5 seconds
         print(f"DEBUG - Response status code: {response.status_code}")
         response.raise_for_status()
         
@@ -471,6 +478,10 @@ def scrape_airbnb_listings(search_url: str, max_listings: int = 3) -> List[Dict]
     """Main scraping function that tries requests first (faster), then falls back to Selenium"""
     print(f"DEBUG - Starting scraping process for: {search_url}")
     
+    import time
+    start_time = time.time()
+    max_total_time = 15  # Maximum 15 seconds total
+    
     # Try requests first (much faster - 1-2 seconds vs 5-10 seconds)
     print("DEBUG - Trying fast requests method first...")
     try:
@@ -481,7 +492,13 @@ def scrape_airbnb_listings(search_url: str, max_listings: int = 3) -> List[Dict]
     except Exception as e:
         print(f"DEBUG - Requests failed: {e}")
     
-    # Fallback to Selenium only if requests failed
+    # Check if we still have time for Selenium
+    elapsed_time = time.time() - start_time
+    if elapsed_time > max_total_time:
+        print(f"DEBUG - Time limit exceeded ({elapsed_time:.1f}s), skipping Selenium")
+        return generate_fallback_results(search_url)
+    
+    # Fallback to Selenium only if requests failed and we have time
     print("DEBUG - Falling back to Selenium method...")
     try:
         results = scrape_airbnb_listings_selenium(search_url, max_listings)
@@ -491,11 +508,22 @@ def scrape_airbnb_listings(search_url: str, max_listings: int = 3) -> List[Dict]
     except Exception as e:
         print(f"DEBUG - Selenium failed: {e}")
     
-    # Final fallback - return redirect message
+    # Final fallback
+    return generate_fallback_results(search_url)
+
+def generate_fallback_results(search_url: str) -> List[Dict]:
+    """Generate fallback results when scraping fails"""
     print("DEBUG - All scraping methods failed, returning redirect message")
+    location = "your location"
+    if "/s/" in search_url:
+        try:
+            location = search_url.split("/s/")[1].split("/")[0].replace("-", " ").title()
+        except:
+            pass
+    
     return [
         {
-            'title': f'Properties available in {search_url.split("/s/")[1].split("/")[0] if "/s/" in search_url else "your location"}',
+            'title': f'Properties available in {location}',
             'price': 'Visit Airbnb for current pricing',
             'rating': 'See actual reviews on site',
             'link': search_url,

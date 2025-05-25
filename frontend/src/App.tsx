@@ -216,6 +216,98 @@ const App: React.FC = () => {
                 </div>
               ))}
 
+              {/* Search Results integrated into chat flow */}
+              {showPropertySelection && searchResults.length > 0 && (
+                <div className="flex justify-start">
+                  <div className="max-w-full w-full">
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 mb-4">
+                      <h3 className="text-lg font-bold text-gray-800 mb-2">🏡 Found {searchResults.length} Great Options!</h3>
+                      <p className="text-gray-600 text-sm">Click on any property to select it and proceed with booking options:</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                      {searchResults.map((result, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handlePropertySelect(result)}
+                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                            selectedProperty?.link === result.link
+                              ? 'border-green-500 bg-green-50 shadow-lg'
+                              : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-md'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-sm font-medium text-blue-600">
+                              {index + 1}
+                            </span>
+                            {selectedProperty?.link === result.link && (
+                              <span className="text-green-500 text-lg">✓</span>
+                            )}
+                          </div>
+                          
+                          <h4 className="font-semibold text-gray-800 mb-2 text-sm">
+                            {result.title}
+                          </h4>
+                          
+                          <div className="space-y-1 text-xs">
+                            <p className="text-green-600 font-medium">{result.price}</p>
+                            <p className="text-yellow-600">{result.rating}</p>
+                            <p className="text-gray-500 text-xs">
+                              {result.source.includes('selenium') ? '🎧 airbnb_selenium' : 
+                               result.source.includes('requests') ? '📡 airbnb_requests' : 
+                               '🔗 airbnb_redirect'}
+                            </p>
+                          </div>
+                          
+                          <div className="mt-3 text-center">
+                            <p className="text-xs text-gray-500 italic">
+                              {selectedProperty?.link === result.link ? 'Selected! ✓' : 
+                               `Say "Select property ${index + 1}" or "Choose ${['first', 'second', 'third', 'fourth', 'fifth'][index] || 'option'}" or click here`}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Booking Options integrated */}
+                    {showBookingOptions && selectedProperty && (
+                      <div className="mt-6 p-6 bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 rounded-lg text-white">
+                        <div className="text-center mb-4">
+                          <h2 className="text-xl font-bold mb-2">🎉 Great Choice!</h2>
+                          <p className="text-lg">You selected: {selectedProperty.title}</p>
+                          <p className="text-sm mt-2">What would you like to do next?</p>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <button
+                            onClick={handleMessageHostWithFeedback}
+                            className="bg-black bg-opacity-30 text-white p-4 rounded-lg hover:bg-opacity-50 transition-all"
+                          >
+                            <div className="text-2xl mb-2">💬</div>
+                            <div className="font-bold">Message Host</div>
+                            <div className="text-sm opacity-90">Ask questions about amenities, check-in, location, etc.</div>
+                          </button>
+                          
+                          <button
+                            onClick={handleBookNowWithFeedback}
+                            className="bg-black bg-opacity-30 text-white p-4 rounded-lg hover:bg-opacity-50 transition-all"
+                          >
+                            <div className="text-2xl mb-2">🏠</div>
+                            <div className="font-bold">Book Now</div>
+                            <div className="text-sm opacity-90">Proceed to Airbnb to complete your reservation</div>
+                          </button>
+                        </div>
+                        
+                        <div className="text-center text-sm opacity-90">
+                          <p>Both options will redirect you to Airbnb.com for the actual booking or messaging.</p>
+                          <p className="mt-1">✨ This ensures secure transactions and direct host communication.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="bg-gray-200 text-gray-800 rounded-bl-md px-4 py-2 rounded-2xl">
@@ -227,18 +319,6 @@ const App: React.FC = () => {
               <div ref={messagesEndRef} />
             </main>
           </div>
-          
-          {showPropertySelection && (
-            <SearchResults
-              results={searchResults}
-              selectedProperty={selectedProperty}
-              showBookingOptions={showBookingOptions}
-              bookingUrls={bookingUrls}
-              onSelect={handlePropertySelect}
-              onMessageHost={handleMessageHostWithFeedback}
-              onBookNow={handleBookNowWithFeedback}
-            />
-          )}
         </div>
         
         <VoiceControls
