@@ -187,10 +187,29 @@ async def choose_property(request_data: dict):
     """
     try:
         property_data = request_data.get('property')
-        search_params = request_data.get('search_params', {})
+        search_params_raw = request_data.get('search_params', {})
         
         if not property_data:
             raise HTTPException(status_code=400, detail="Property data is required")
+        
+        # Convert search params to dict format expected by URL functions
+        search_params = {}
+        if search_params_raw:
+            # Handle both dict and SearchParams object formats
+            if hasattr(search_params_raw, '__dict__'):
+                # SearchParams object
+                search_params = {
+                    'guests': search_params_raw.guests,
+                    'checkin': search_params_raw.checkin,
+                    'checkout': search_params_raw.checkout,
+                    'min_price': search_params_raw.min_price,
+                    'max_price': search_params_raw.max_price,
+                    'location': search_params_raw.location,
+                    'property_type': search_params_raw.property_type,
+                }
+            else:
+                # Already a dict
+                search_params = search_params_raw
         
         # Extract property details
         property_title = property_data.get('title', '')
@@ -250,16 +269,19 @@ def generate_airbnb_urls(listing_url, search_params=None):
     # Build contact host URL parameters
     contact_params = [f"adults={guests}"]
     
-    # Add dates if available (use underscore format for contact host)
-    if search_params.get('check_in'):
-        contact_params.append(f"check_in={search_params['check_in']}")
-    if search_params.get('check_out'):
-        contact_params.append(f"check_out={search_params['check_out']}")
+    # Add dates - prioritize extracted dates over defaults
+    checkin_date = search_params.get('checkin') or search_params.get('check_in')
+    checkout_date = search_params.get('checkout') or search_params.get('check_out')
+    
+    if checkin_date and checkout_date:
+        contact_params.extend([f"check_in={checkin_date}", f"check_out={checkout_date}"])
+        print(f"DEBUG - Using extracted dates for contact: {checkin_date} to {checkout_date}")
     else:
-        # Add default dates
+        # Add default dates only if none provided
         check_in = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
         check_out = (datetime.now() + timedelta(days=10)).strftime('%Y-%m-%d')
         contact_params.extend([f"check_in={check_in}", f"check_out={check_out}"])
+        print(f"DEBUG - Using default dates for contact: {check_in} to {check_out}")
     
     contact_query = "&".join(contact_params)
     message_host_url = f"https://www.airbnb.com/contact_host/{room_id}/send_message?{contact_query}"
@@ -311,16 +333,19 @@ def generate_booking_url(room_id, search_params):
         f"numberOfPets=0"
     ]
     
-    # Add dates if available (no underscore format for booking)
-    if search_params.get('check_in'):
-        params.append(f"checkin={search_params['check_in']}")
-    if search_params.get('check_out'):
-        params.append(f"checkout={search_params['check_out']}")
+    # Add dates - prioritize extracted dates over defaults
+    checkin_date = search_params.get('checkin') or search_params.get('check_in')
+    checkout_date = search_params.get('checkout') or search_params.get('check_out')
+    
+    if checkin_date and checkout_date:
+        params.extend([f"checkin={checkin_date}", f"checkout={checkout_date}"])
+        print(f"DEBUG - Using extracted dates for booking: {checkin_date} to {checkout_date}")
     else:
-        # Add default dates
+        # Add default dates only if none provided
         check_in = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
         check_out = (datetime.now() + timedelta(days=10)).strftime('%Y-%m-%d')
         params.extend([f"checkin={check_in}", f"checkout={check_out}"])
+        print(f"DEBUG - Using default dates for booking: {check_in} to {check_out}")
     
     query_string = "&".join(params)
     

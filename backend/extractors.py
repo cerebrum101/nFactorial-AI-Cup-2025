@@ -2,6 +2,7 @@ import re
 import json
 import os
 from typing import List
+from datetime import datetime, timedelta
 from models import SearchParams, AIRBNB_PROPERTY_TYPES
 from groq import Groq
 from dotenv import load_dotenv
@@ -14,7 +15,114 @@ load_dotenv()
 def get_groq_client():
     return Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-
+def extract_dates_from_text(text: str) -> tuple[str, str]:
+    """Extract check-in and check-out dates from text"""
+    print(f"DEBUG - Extracting dates from: '{text}'")
+    
+    # Date patterns to match various formats
+    date_patterns = [
+        # Month/Day - Month/Day (e.g., "6/15 - 6/20", "6/15-6/20")
+        r"(\d{1,2})/(\d{1,2})\s*-\s*(\d{1,2})/(\d{1,2})",
+        # Month Day - Month Day (e.g., "June 15 - June 20", "Jun 15-20")
+        r"(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})\s*-\s*(?:(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+)?(\d{1,2})",
+        # Day Month - Day Month (e.g., "15 June - 20 June")
+        r"(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*-\s*(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)",
+        # MM-DD format (e.g., "06-15 to 06-20")
+        r"(\d{1,2})-(\d{1,2})\s*(?:to|through|-)\s*(\d{1,2})-(\d{1,2})",
+        # Single dates mentioned separately
+        r"(?:check.?in|arrive|arrival|start).*?(\d{1,2})/(\d{1,2})|(\d{1,2})/(\d{1,2}).*?(?:check.?in|arrive|arrival|start)",
+        r"(?:check.?out|leave|departure|end).*?(\d{1,2})/(\d{1,2})|(\d{1,2})/(\d{1,2}).*?(?:check.?out|leave|departure|end)",
+    ]
+    
+    current_year = datetime.now().year
+    checkin_date = None
+    checkout_date = None
+    
+    for pattern in date_patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            try:
+                groups = match.groups()
+                print(f"DEBUG - Date pattern matched: {match.group(0)} -> groups: {groups}")
+                
+                if "check.?in" in pattern or "arrive" in pattern:
+                    # Handle check-in patterns
+                    month = int(groups[0] or groups[2]) if groups[0] or groups[2] else None
+                    day = int(groups[1] or groups[3]) if groups[1] or groups[3] else None
+                    if month and day:
+                        checkin_date = f"{current_year}-{month:02d}-{day:02d}"
+                elif "check.?out" in pattern or "leave" in pattern:
+                    # Handle check-out patterns
+                    month = int(groups[0] or groups[2]) if groups[0] or groups[2] else None
+                    day = int(groups[1] or groups[3]) if groups[1] or groups[3] else None
+                    if month and day:
+                        checkout_date = f"{current_year}-{month:02d}-{day:02d}"
+                elif len(groups) >= 4 and all(g for g in groups[:4]):
+                    # Handle range patterns like "6/15 - 6/20"
+                    if groups[0].isdigit() and groups[1].isdigit():
+                        # MM/DD - MM/DD format
+                        checkin_month, checkin_day = int(groups[0]), int(groups[1])
+                        checkout_month, checkout_day = int(groups[2]), int(groups[3])
+                        
+                        checkin_date = f"{current_year}-{checkin_month:02d}-{checkin_day:02d}"
+                        checkout_date = f"{current_year}-{checkout_month:02d}-{checkout_day:02d}"
+                        
+                    else:
+                        # Month name format
+                        month_names = {
+                            'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+                            'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
+                            'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+                        }
+                        
+                        checkin_month_name = groups[0].lower()
+                        checkin_day = int(groups[1])
+                        checkout_month_name = (groups[2] or groups[0]).lower()  # Use same month if not specified
+                        checkout_day = int(groups[3])
+                        
+                        if checkin_month_name in month_names and checkout_month_name in month_names:
+                            checkin_month = month_names[checkin_month_name]
+                            checkout_month = month_names[checkout_month_name]
+                            
+                            checkin_date = f"{current_year}-{checkin_month:02d}-{checkin_day:02d}"
+                            checkout_date = f"{current_year}-{checkout_month:02d}-{checkout_day:02d}"
+                
+                if checkin_date and checkout_date:
+                    break
+                    
+            except (ValueError, IndexError) as e:
+                print(f"DEBUG - Error parsing date match: {e}")
+                continue
+    
+    # Validate and fix dates
+    if checkin_date and checkout_date:
+        try:
+            checkin_dt = datetime.strptime(checkin_date, "%Y-%m-%d")
+            checkout_dt = datetime.strptime(checkout_date, "%Y-%m-%d")
+            
+            # Ensure check-out is after check-in
+            if checkout_dt <= checkin_dt:
+                checkout_dt = checkin_dt + timedelta(days=3)  # Default 3-day stay
+                checkout_date = checkout_dt.strftime("%Y-%m-%d")
+            
+            # Ensure dates are not in the past
+            today = datetime.now()
+            if checkin_dt < today:
+                # Move dates to next occurrence
+                if checkin_dt.month < today.month or (checkin_dt.month == today.month and checkin_dt.day < today.day):
+                    checkin_dt = checkin_dt.replace(year=current_year + 1)
+                    checkout_dt = checkout_dt.replace(year=current_year + 1)
+                    checkin_date = checkin_dt.strftime("%Y-%m-%d")
+                    checkout_date = checkout_dt.strftime("%Y-%m-%d")
+            
+            print(f"DEBUG - Extracted and validated dates: {checkin_date} to {checkout_date}")
+            return checkin_date, checkout_date
+            
+        except ValueError as e:
+            print(f"DEBUG - Date validation error: {e}")
+    
+    print("DEBUG - No valid dates extracted")
+    return None, None
 
 def extract_search_params_with_llm(conversation_text: str) -> SearchParams:
     """Use LLM to extract search parameters from conversation in any language"""
@@ -27,11 +135,20 @@ Conversation: "{conversation_text}"
 Please extract and respond with ONLY a JSON object in this exact format:
 {{
     "location": "city name in English (e.g. Istanbul, New York, Moscow)",
+    "checkin": "YYYY-MM-DD or null",
+    "checkout": "YYYY-MM-DD or null", 
     "guests": number or null,
     "min_price": number or null, 
     "max_price": number or null,
     "property_type": "apartment/house/villa/cabin/loft/cottage" or null
 }}
+
+DATE EXTRACTION RULES:
+- "6/15 - 6/20" → checkin: "2024-06-15", checkout: "2024-06-20"
+- "June 15-20" → checkin: "2024-06-15", checkout: "2024-06-20"
+- "15 June to 20 June" → checkin: "2024-06-15", checkout: "2024-06-20"
+- Always use current year (2024) unless specified otherwise
+- Ensure checkout date is after checkin date
 
 CRITICAL PRICING RULES:
 - "70 USD max" or "maximum 70" or "up to 70" → set ONLY max_price: 70, min_price: null
@@ -39,12 +156,6 @@ CRITICAL PRICING RULES:
 - "around 200" or "about 200" or "roughly 200" → set min_price: 150, max_price: 250
 - "100-200" or "between 100 and 200" or "from 100 to 200" → set min_price: 100, max_price: 200
 - "at least 100" or "minimum 100" or "starting from 100" → set ONLY min_price: 100, max_price: null
-
-EXAMPLES:
-- "70 per day max" → {"min_price": null, "max_price": 70}
-- "around 200 per night" → {"min_price": 150, "max_price": 250}  
-- "100 to 300 range" → {"min_price": 100, "max_price": 300}
-- "under 80 dollars" → {"min_price": null, "max_price": 80}
 
 OTHER RULES:
 - Convert city names to English (стамбул → Istanbul, нью-йорк → New York)
@@ -74,12 +185,14 @@ DO NOT set both min_price and max_price to the same value unless explicitly give
             
             params = SearchParams()
             params.location = extracted_data.get('location')
+            params.checkin = extracted_data.get('checkin')
+            params.checkout = extracted_data.get('checkout')
             params.guests = extracted_data.get('guests')
             params.min_price = extracted_data.get('min_price') 
             params.max_price = extracted_data.get('max_price')
             params.property_type = extracted_data.get('property_type')
             
-            print(f"DEBUG - LLM extracted successfully: location='{params.location}', guests={params.guests}, price=${params.min_price}-${params.max_price}")
+            print(f"DEBUG - LLM extracted successfully: location='{params.location}', dates={params.checkin} to {params.checkout}, guests={params.guests}, price=${params.min_price}-${params.max_price}")
             return params
             
         except json.JSONDecodeError as e:
@@ -99,6 +212,13 @@ def extract_search_params_regex(conversation_text: str) -> SearchParams:
     params = SearchParams()
     
     print(f"DEBUG - Input text: '{conversation_text}'")
+    
+    # Extract dates first
+    checkin_date, checkout_date = extract_dates_from_text(conversation_text)
+    if checkin_date:
+        params.checkin = checkin_date
+    if checkout_date:
+        params.checkout = checkout_date
     
     # First try to find known cities/locations directly (more reliable)
     known_locations = [
@@ -281,7 +401,7 @@ def extract_search_params_regex(conversation_text: str) -> SearchParams:
     if detected_amenities:
         params.amenities = detected_amenities
     
-    print(f"DEBUG - Final extracted params: location='{params.location}', guests={params.guests}, price_max={params.max_price}, property_type='{params.property_type}'")
+    print(f"DEBUG - Final extracted params: location='{params.location}', dates={params.checkin} to {params.checkout}, guests={params.guests}, price_max={params.max_price}, property_type='{params.property_type}'")
     
     return params 
 
@@ -306,6 +426,10 @@ def extract_search_params(conversation_text: str) -> SearchParams:
         # Merge results - prioritize LLM location if regex failed
         if llm_params.location and not params.location:
             params.location = llm_params.location
+        if llm_params.checkin and not params.checkin:
+            params.checkin = llm_params.checkin
+        if llm_params.checkout and not params.checkout:
+            params.checkout = llm_params.checkout
         if llm_params.guests and not params.guests:
             params.guests = llm_params.guests
         if llm_params.min_price and not params.min_price:

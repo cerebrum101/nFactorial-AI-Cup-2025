@@ -95,120 +95,205 @@ def validate_and_fix_params(params: SearchParams, conversation_text: str) -> Sea
 
 def should_trigger_search(message: str, params: SearchParams, conversation_history: list) -> bool:
     """
-    Simplified logic to determine when to trigger search.
-    Be much more aggressive about searching when we have basic info.
+    AGGRESSIVE search triggering logic - search immediately when we have sufficient info.
+    Don't make users wait or ask multiple times.
     """
     
-    # Must have location as minimum requirement
+    # Must have location as absolute minimum
     if not params.location:
         print("DEBUG - No search: Missing location")
         return False
     
     message_lower = message.lower().strip()
     
-    # Simple affirmative responses - be VERY generous
+    # IMMEDIATE SEARCH CONDITIONS - very generous
+    
+    # 1. Any affirmative response - search immediately
     affirmative_responses = [
         "yes", "yep", "yeah", "ok", "okay", "sure", "go", "go ahead", 
         "do it", "correct", "that's right", "start searching", "search",
         "find", "let's go", "proceed", "continue", "good", "right", "fine",
-        "perfect", "exactly", "sounds good", "looks good", "confirmed"
+        "perfect", "exactly", "sounds good", "looks good", "confirmed",
+        "do it now", "search now", "start", "begin", "now", "please"
     ]
     
-    # Check for simple affirmative responses
     if message_lower in affirmative_responses:
-        print(f"DEBUG - Search triggered: Affirmative response '{message_lower}'")
+        print(f"DEBUG - IMMEDIATE SEARCH: Affirmative response '{message_lower}'")
         return True
     
-    # Explicit search trigger phrases (high confidence)
-    explicit_triggers = [
-        "search", "find", "look for", "show me", "what's available",
-        "can you search", "let's see", "ready to search", "search for",
-        "find me", "show options", "what do you have", "let me see",
-        "get me", "just get me", "under $", "under ", "max $", "budget",
-        "do it again", "search again", "try again", "again", "repeat",
-        "go", "start", "begin", "now"  # Added more trigger words
+    # 2. Explicit search commands - always search
+    explicit_search_triggers = [
+        "search", "find", "look for", "show me", "what's available", "available",
+        "can you search", "let's see", "search for", "find me", "show options", 
+        "what do you have", "let me see", "get me", "just get me", "now search",
+        "do search", "start search", "run search", "please search", "search please"
     ]
     
-    has_explicit_trigger = any(phrase in message_lower for phrase in explicit_triggers)
-    
-    if has_explicit_trigger:
-        print(f"DEBUG - Search triggered: Explicit request detected")
+    if any(trigger in message_lower for trigger in explicit_search_triggers):
+        print(f"DEBUG - IMMEDIATE SEARCH: Explicit search command detected")
         return True
     
-    # If user provided specific dates, prices, or details in this message, search immediately
-    detail_indicators = [
-        r"\d+\s*-\s*\d+\s*(?:june|july|august|may|april|march|january|february|september|october|november|december)",
-        r"(?:june|july|august|may|april|march|january|february|september|october|november|december)\s*\d+",
-        r"\$\d+", r"budget", r"max", r"fixed", r"exact", r"specific",
-        r"\d+\s+(?:adults?|people|guests?)", r"for\s+\d+", r"\d+\s+of\s+us"
+    # 3. Budget/price mentions - if user gives price info, search immediately
+    price_indicators = [
+        "$", "budget", "max", "maximum", "under", "below", "up to", "around",
+        "cost", "price", "expensive", "cheap", "affordable", "dollar"
     ]
     
-    for pattern in detail_indicators:
-        if re.search(pattern, message_lower):
-            print(f"DEBUG - Search triggered: Specific details provided")
+    if any(indicator in message_lower for indicator in price_indicators):
+        print(f"DEBUG - IMMEDIATE SEARCH: Price/budget mentioned")
+        return True
+    
+    # 4. Date mentions - if user gives dates, search immediately
+    date_indicators = [
+        "june", "july", "august", "may", "april", "march", "january", "february",
+        "september", "october", "november", "december", "/", "-", "check in", 
+        "check out", "checkin", "checkout", "dates", "when", "stay"
+    ]
+    
+    if any(date in message_lower for date in date_indicators):
+        print(f"DEBUG - IMMEDIATE SEARCH: Date mentioned")
+        return True
+    
+    # 5. Guest count mentions - search immediately
+    guest_indicators = [
+        "people", "guests", "guest", "adults", "adult", "person", "persons",
+        "for 1", "for 2", "for 3", "for 4", "for 5", "for 6", "for 7", "for 8",
+        "1 person", "2 people", "3 people", "4 people", "5 people", "6 people"
+    ]
+    
+    if any(guest in message_lower for guest in guest_indicators):
+        print(f"DEBUG - IMMEDIATE SEARCH: Guest count mentioned")
+        return True
+    
+    # 6. Auto-trigger if we have location + ANY additional parameter - be very aggressive
+    has_additional_info = (
+        params.guests or 
+        params.max_price or 
+        params.min_price or 
+        params.property_type or
+        params.checkin or
+        params.checkout or
+        (params.amenities and len(params.amenities) > 0)
+    )
+    
+    if params.location and has_additional_info:
+        # Only check for explicit "no" or "stop" commands
+        stop_words = ["no", "not", "don't", "stop", "wait", "hold on", "first", "before"]
+        if not any(stop in message_lower for stop in stop_words):
+            print(f"DEBUG - AUTO SEARCH: Have location + additional info (guests={params.guests}, price={params.max_price}, dates={params.checkin})")
             return True
     
-    # NEW: Auto-trigger if we have location and ANY additional info (be more aggressive)
-    if (params.location and 
-        (params.guests or params.max_price or params.min_price or params.property_type) and
-        not any(word in message_lower for word in ["no", "not", "don't", "wait", "stop", "first", "before"])):
-        print(f"DEBUG - Auto-search triggered: Have location and additional details")
+    # 7. Area/location specifications - search immediately
+    area_specs = [
+        "downtown", "center", "near", "close to", "area", "district", 
+        "neighborhood", "region", "zone", "part of", "side of"
+    ]
+    
+    if params.location and any(spec in message_lower for spec in area_specs):
+        print(f"DEBUG - IMMEDIATE SEARCH: Location + area specification")
         return True
     
-    # NEW: If user gives location + any specific request words, search immediately
-    if (params.location and 
-        any(word in message_lower for word in ["close to", "center", "downtown", "near", "area", "district", "neighborhood"]) and
-        not any(word in message_lower for word in ["no", "not", "don't", "wait", "stop"])):
-        print(f"DEBUG - Search triggered: Location + area specification")
+    # 8. Property type mentions - search immediately
+    property_types = [
+        "apartment", "house", "villa", "cabin", "loft", "cottage", "home",
+        "studio", "room", "place", "accommodation", "rental"
+    ]
+    
+    if params.location and any(prop_type in message_lower for prop_type in property_types):
+        print(f"DEBUG - IMMEDIATE SEARCH: Location + property type mentioned")
         return True
     
-    print(f"DEBUG - No search triggered")
+    # 9. If user is providing any specific details at all - search
+    detail_patterns = [
+        r"\d+",  # Any number (guests, dates, prices)
+        r"[A-Z][a-z]+\s+\d+",  # Month + day patterns
+        r"\d+/\d+",  # Date patterns
+        r"\$\d+",  # Price patterns
+    ]
+    
+    if params.location:
+        for pattern in detail_patterns:
+            if re.search(pattern, message):
+                print(f"DEBUG - IMMEDIATE SEARCH: Location + specific details provided")
+                return True
+    
+    # 10. If this message contains a location for the first time - search immediately
+    # (Don't make user wait for confirmation)
+    if params.location:
+        # Check if this is the first time location was mentioned
+        previous_messages = " ".join([msg.get("text", "") for msg in conversation_history if msg.get("sender") == "user"])
+        if params.location.lower() not in previous_messages.lower():
+            print(f"DEBUG - IMMEDIATE SEARCH: New location mentioned - searching immediately")
+            return True
+    
+    print(f"DEBUG - No search triggered for message: '{message}'")
     return False
 
 def should_show_confirmation(params: SearchParams, conversation_history: list) -> bool:
     """
-    Much more restrictive confirmation logic.
-    Almost never show confirmations - just search immediately.
+    VERY RESTRICTIVE confirmation logic - almost never show confirmations.
+    Just search immediately in 95% of cases.
     """
     
     # Must have location as minimum
     if not params.location:
         return False
     
-    # Check if we recently showed a confirmation - look at last 5 messages
+    # NEVER show confirmation if we already have detailed parameters
+    has_good_info = (
+        params.location and (
+            params.guests or 
+            params.max_price or 
+            params.min_price or
+            params.checkin or
+            params.checkout
+        )
+    )
+    
+    if has_good_info:
+        print("DEBUG - No confirmation: Have sufficient details for immediate search")
+        return False
+    
+    # Check if we recently showed a confirmation - NEVER repeat
     recent_conversation = ""
     if conversation_history:
-        for msg in conversation_history[-5:]:  # Increased from 3 to 5
+        for msg in conversation_history[-10:]:  # Check last 10 messages
             if msg.get("sender") == "assistant":
                 recent_conversation += msg.get("text", "").lower()
     
-    # Don't show confirmation again if we EVER showed it recently
     confirmation_indicators = [
         "is this correct", "should i start searching", "would you like me to search",
         "ready to search", "does this look good", "confirm these details",
         "search for", "does this sound right", "correct?", "right?",
-        "shall i", "should i", "ready to", "confirmation", "confirm"
+        "shall i", "should i", "ready to", "confirmation", "confirm",
+        "would you like", "want me to"
     ]
     
     if any(indicator in recent_conversation for indicator in confirmation_indicators):
-        print("DEBUG - Confirmation already shown recently")
+        print("DEBUG - No confirmation: Already asked recently")
         return False
     
-    # Calculate completeness score
-    info_completeness_score = 0
-    if params.location: info_completeness_score += 2
-    if params.guests: info_completeness_score += 1
-    if params.min_price or params.max_price: info_completeness_score += 1
-    if params.property_type: info_completeness_score += 0.5
-    if params.amenities: info_completeness_score += 0.5
+    # Only show confirmation in extremely rare cases - when we ONLY have location
+    # and user hasn't given any other details at all
+    only_has_location = (
+        params.location and
+        not params.guests and
+        not params.max_price and
+        not params.min_price and
+        not params.checkin and
+        not params.checkout and
+        not params.property_type and
+        not params.amenities
+    )
     
-    # ALMOST NEVER confirm - only for extremely complex requests
-    # Most searches should happen immediately without confirmation
-    if info_completeness_score >= 6:  # Very high threshold - was 4, now 6
-        print(f"DEBUG - Should show confirmation: completeness score {info_completeness_score}")
-        return True
+    if only_has_location:
+        # Even then, only if the conversation is very short (they just said the city)
+        total_user_messages = len([msg for msg in conversation_history if msg.get("sender") == "user"])
+        if total_user_messages <= 2:  # Very early in conversation
+            print("DEBUG - Showing confirmation: Only location provided early in conversation")
+            return True
     
-    print(f"DEBUG - Not showing confirmation: score {info_completeness_score} (need 6+)")
+    print("DEBUG - No confirmation: Proceeding directly to search")
     return False
 
 def get_missing_params_message(params: SearchParams) -> str:
