@@ -5,6 +5,7 @@ from groq import Groq
 from dotenv import load_dotenv
 import re
 from datetime import datetime, timedelta
+import time
 
 # Import our modular components
 from models import ChatMessage, ChatResponse
@@ -42,32 +43,52 @@ async def root():
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(chat_data: ChatMessage):
+    start_time = time.time()
+    
     try:
-        # Extract search parameters from USER messages only (not mixed conversation)
-        user_messages = [msg["text"] for msg in chat_data.conversation_history if msg["sender"] == "user"]
-        user_messages.append(chat_data.message)  # Add current user message
-        user_conversation = " ".join(user_messages)
+        # Quick check if this is likely a search query BEFORE expensive processing
+        message_lower = chat_data.message.lower()
+        is_likely_search = any(keyword in message_lower for keyword in [
+            'apartment', 'hotel', 'house', 'place', 'stay', 'accommodation', 'rent', 'booking', 'airbnb',
+            'location', 'city', 'travel', 'trip', 'visit', 'budget', 'price', 'people', 'guests',
+            'search', 'find', 'looking', 'need', 'want'
+        ])
         
-        print(f"DEBUG - User messages only: {user_conversation}")
+        print(f"DEBUG - Quick search check: {is_likely_search} for message: '{chat_data.message[:100]}...'")
         
-        search_params = extract_search_params(user_conversation)
-        
-        # Validate and fix the extracted parameters
-        search_params = validate_and_fix_params(search_params, user_conversation)
-        
-        # Debug: Print extracted parameters
-        print(f"DEBUG - Full conversation: {user_conversation}")
-        print(f"DEBUG - Extracted location: {search_params.location}")
-        print(f"DEBUG - Extracted guests: {search_params.guests}")
-        print(f"DEBUG - Extracted price range: ${search_params.min_price}-${search_params.max_price}")
-        
-        # NEW: Check if we should show confirmation before searching
-        should_confirm = should_show_confirmation(search_params, chat_data.conversation_history)
-        should_search = should_trigger_search(
-            chat_data.message, 
-            search_params, 
-            chat_data.conversation_history
-        )
+        # Only do expensive parameter extraction if likely a search
+        if is_likely_search:
+            # Extract search parameters from USER messages only (not mixed conversation)
+            user_messages = [msg["text"] for msg in chat_data.conversation_history if msg["sender"] == "user"]
+            user_messages.append(chat_data.message)  # Add current user message
+            user_conversation = " ".join(user_messages)
+            
+            print(f"DEBUG - User messages only: {user_conversation}")
+            
+            search_params = extract_search_params(user_conversation)
+            
+            # Validate and fix the extracted parameters
+            search_params = validate_and_fix_params(search_params, user_conversation)
+            
+            # Debug: Print extracted parameters
+            print(f"DEBUG - Full conversation: {user_conversation}")
+            print(f"DEBUG - Extracted location: {search_params.location}")
+            print(f"DEBUG - Extracted guests: {search_params.guests}")
+            print(f"DEBUG - Extracted price range: ${search_params.min_price}-${search_params.max_price}")
+            
+            # NEW: Check if we should show confirmation before searching
+            should_confirm = should_show_confirmation(search_params, chat_data.conversation_history)
+            should_search = should_trigger_search(
+                chat_data.message, 
+                search_params, 
+                chat_data.conversation_history
+            )
+        else:
+            # Skip expensive parameter extraction for non-search queries
+            from models import SearchParams
+            search_params = SearchParams()
+            should_confirm = False
+            should_search = False
         
         print(f"DEBUG - Should show confirmation: {should_confirm}")
         print(f"DEBUG - Should trigger search: {should_search}")
@@ -104,14 +125,20 @@ async def chat(chat_data: ChatMessage):
         
         else:
             # Add context about missing information
-            missing_info = get_missing_params_message(search_params)
-            persona_prompt = get_persona_prompt(f"\n\nCONTEXT: {missing_info}")
+            if is_likely_search:
+                missing_info = get_missing_params_message(search_params)
+                persona_prompt = get_persona_prompt(f"\n\nCONTEXT: {missing_info}")
+            else:
+                # Regular conversation
+                persona_prompt = get_persona_prompt()
         
-        # Build conversation history for context
+        # Build conversation history for context (limit to last 6 messages for speed)
         messages = [{"role": "system", "content": persona_prompt}]
         
-        # Add conversation history
-        for msg in chat_data.conversation_history:
+        # Add only recent conversation history (last 3 exchanges = 6 messages max)
+        recent_history = chat_data.conversation_history[-6:] if len(chat_data.conversation_history) > 6 else chat_data.conversation_history
+        
+        for msg in recent_history:
             messages.append({
                 "role": "user" if msg["sender"] == "user" else "assistant",
                 "content": msg["text"]
@@ -120,17 +147,27 @@ async def chat(chat_data: ChatMessage):
         # Add current message
         messages.append({"role": "user", "content": chat_data.message})
         
-        # Call Groq API
+        processing_time = time.time() - start_time
+        print(f"DEBUG - Processing time before Groq API: {processing_time:.2f}s")
+        
+        # Call Groq API with timeout
+        groq_start = time.time()
         completion = get_groq_client().chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=messages,
             temperature=0.7,
-            max_tokens=400,  # Increased for search results
+            max_tokens=300,  # Reduced from 400 for faster response
             top_p=1,
             stream=False
         )
         
+        groq_time = time.time() - groq_start
+        print(f"DEBUG - Groq API time: {groq_time:.2f}s")
+        
         response_text = completion.choices[0].message.content
+        
+        total_time = time.time() - start_time
+        print(f"DEBUG - Total response time: {total_time:.2f}s")
         
         return ChatResponse(
             response=response_text,
@@ -139,7 +176,8 @@ async def chat(chat_data: ChatMessage):
         )
         
     except Exception as e:
-        print(f"DEBUG - Main error: {e}")
+        total_time = time.time() - start_time
+        print(f"DEBUG - Error after {total_time:.2f}s: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing chat: {str(e)}")
 
 @app.post("/choose-property")

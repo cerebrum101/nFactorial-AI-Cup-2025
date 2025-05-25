@@ -286,19 +286,33 @@ def extract_search_params_regex(conversation_text: str) -> SearchParams:
     return params 
 
 def extract_search_params(conversation_text: str) -> SearchParams:
-    """Main extraction function - tries LLM first, falls back to regex"""
-    print(f"DEBUG - Starting parameter extraction for: '{conversation_text[:100]}...'")
+    """Extract search parameters from conversation text - optimized for speed"""
     
-    # Try LLM-based extraction first (handles any language)
-    try:
-        params = extract_search_params_with_llm(conversation_text)
-        if params.location:  # If LLM found a location, use its results
-            print(f"DEBUG - Using LLM extraction results")
-            return params
-        else:
-            print(f"DEBUG - LLM didn't find location, trying regex fallback")
-    except Exception as e:
-        print(f"DEBUG - LLM extraction failed: {e}, trying regex fallback")
+    # Try fast regex extraction first
+    params = extract_search_params_regex(conversation_text)
     
-    # Fallback to regex-based extraction
-    return extract_search_params_regex(conversation_text) 
+    # Only use expensive LLM if we have complex input and missing critical info
+    needs_llm = (
+        not params.location and  # No location found
+        len(conversation_text) > 50 and  # Complex enough to warrant LLM
+        any(keyword in conversation_text.lower() for keyword in [
+            'accommodation', 'travel', 'trip', 'visit', 'booking', 'stay'
+        ])
+    )
+    
+    if needs_llm:
+        print("DEBUG - Using LLM for complex parameter extraction")
+        llm_params = extract_search_params_with_llm(conversation_text)
+        # Merge results - prioritize LLM location if regex failed
+        if llm_params.location and not params.location:
+            params.location = llm_params.location
+        if llm_params.guests and not params.guests:
+            params.guests = llm_params.guests
+        if llm_params.min_price and not params.min_price:
+            params.min_price = llm_params.min_price
+        if llm_params.max_price and not params.max_price:
+            params.max_price = llm_params.max_price
+    else:
+        print("DEBUG - Using fast regex extraction only")
+    
+    return params 
